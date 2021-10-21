@@ -1,3 +1,3 @@
-# Copper
+# copper
 
 SSL for planetary science.
