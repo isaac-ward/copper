@@ -4,28 +4,31 @@ from torch.utils.data import Dataset
 
 import numpy as np
 
-def get_train_val_test_datasets(data_folder):
+def get_train_val_test_datasets(data_folder, train_fraction):
     # Data from this set is stored in an npz file
     def load_npz_file(filename):
         data = np.load(f'{data_folder}/{filename}')
         train, test = data['arr_0'], data['arr_1']
+
+        # Convert to float32
+        train = np.float32(train)
+        test = np.float32(test)
+
         return train, test
     
     # Load the full data
     xs = load_npz_file('PSI1.npz')
     ys = load_npz_file('PSI2.npz')
 
-    print(xs[0].shape)
-
     # Return the trio of datasets
     return \
-        DatasetTurbulence(xs, ys, 'train'), \
+        DatasetTurbulence(xs, ys, 'train', train_fraction=train_fraction), \
         DatasetTurbulence(xs, ys, 'val'), \
         DatasetTurbulence(xs, ys, 'test')
 
 
 class DatasetTurbulence(Dataset):
-    def __init__(self, xs, ys, split):#, train_fraction=1.0):
+    def __init__(self, xs, ys, split, train_fraction=1.0):
 
         # Unwrap the loaded raw data
         x, x_test = xs
@@ -51,7 +54,7 @@ class DatasetTurbulence(Dataset):
         if split == 'train':
             # Sometimes we may only want a fraction of the training data. Its shuffled
             # so we can just take the first part
-            n = len(self.x)
+            n = len(x_train)
             n_fraction = int(train_fraction * n)
             self.x = x_train[:n_fraction]
             self.y = y_train[:n_fraction]
@@ -66,11 +69,18 @@ class DatasetTurbulence(Dataset):
 
         assert len(self.x) == len(self.y), f'Dataset error: length of x ({len(self.x)}) not equal to length of y ({len(self.x)})'
 
+        # PyTorch generall expects the order of axes to be (3,h,w)
+        self.x = np.repeat(self.x, 3, -1)
+        self.x = self.x.swapaxes(1, 3)
+        self.x = self.x.swapaxes(2, 3)
+
         # Announce useful information
         print(f"{split} split:")
         print(f"\tx.shape={self.x.shape}")
+        print(f"\tx.dtype={self.x.dtype}")
         print(f"\ty.shape={self.y.shape}")
-        print(f"\tfraction of data retained={train_fraction}")
+        print(f"\ty.dtype={self.y.dtype}")
+        print(f"\tfraction of data returned={train_fraction}")
 
         """
         # Don't do this - its a regression problem!

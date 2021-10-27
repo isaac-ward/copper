@@ -1,3 +1,7 @@
-data/*
+dev/copper/*
+dev/data/*
+dev/wandb/*
+
+__pycache__
 
 !.gitkeep
