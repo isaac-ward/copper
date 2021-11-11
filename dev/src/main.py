@@ -14,6 +14,7 @@ import data.dm
 import models
 
 # Prevents the prompt
+# Hey Edwin - this is my personal WANDB API key
 os.environ["WANDB_API_KEY"] = "a6cdd4fa5fdf946057a6e2825ad0e9addbeed513"
 
 # Execute when the module is not initialized from an import statement
@@ -33,25 +34,41 @@ if __name__ == '__main__':
     print(f'{torch.cuda.device_count()} CUDA devices found')
     print(f'CUDA available = {torch.cuda.is_available()}')
 
-    train_fraction = [ 1.0, 0.5, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001 ]
+    #train_fraction = [ 1.0, 0.5, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001 ]
+    #train_fraction.reverse()
+
+    # Update train fractions
+    desired_amounts = [
+        1051.0510510510503,
+        2402.402402402404,
+        4804.804804804808,
+        9759.75975975976,
+        19819.819819819822,
+        39789.78978978979,
+        49849.84984984986,
+        59909.909909909904,
+        74924.92492492494,
+        91689
+    ]
+    train_fraction = [ n / 91689 for n in desired_amounts ]
 
     for tf in train_fraction:
 
         # Get a logger 
-        wandb_logger = pytorch_lightning.loggers.WandbLogger(project='copper', log_model=False, name=f"fraction={tf}")
+        wandb_logger = pytorch_lightning.loggers.WandbLogger(project='copper-hists', log_model=False, name=f"fraction={tf}")
 
         # Get the data
         #ds_train, ds_val, ds_test = data.ds.get_train_val_test_datasets(folder_data)
         #dl_train, dl_val, dl_test = data.dl.get_train_val_test_dataloaders(folder_data, batch_size=64)
-        dm_turbulence = data.dm.TurbulenceDataModule(folder_data, batch_size=64, train_fraction=1.0)
+        dm_turbulence = data.dm.TurbulenceDataModule(folder_data, batch_size=512, train_fraction=tf)
 
         # Get the model
-        model_baseline = models.BaselineModel(lr=0.00001)
+        model_baseline = models.Model(lr=0.01)
 
         # Set up the trainer
         trainer = pl.Trainer(
-            max_epochs=12, 
-            precision=16,
+            max_epochs=0, 
+            precision=32,
             gpus=1, 
             accelerator='dp',
             num_sanity_val_steps=2, 
@@ -63,6 +80,7 @@ if __name__ == '__main__':
 
         # Run the experiment
         trainer.fit(model_baseline, dm_turbulence)
+        trainer.test(model_baseline, dm_turbulence)
 
         # This run is complete
         wandb.finish()

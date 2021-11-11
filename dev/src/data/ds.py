@@ -2,6 +2,8 @@ import torch
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
+import wandb
+
 import numpy as np
 
 def get_train_val_test_datasets(data_folder, train_fraction):
@@ -59,6 +61,13 @@ class DatasetTurbulence(Dataset):
             self.x = x_train[:n_fraction]
             self.y = y_train[:n_fraction]
 
+            # Plot histogram
+            wandb.init()
+            data = [[_] for _ in self.y]
+            table = wandb.Table(data=data, columns=["targets"])
+            wandb.log({'histogram': wandb.plot.histogram(table, "targets",
+                title="Label Distribution")})
+
         elif split == 'val':
             self.x = x_val
             self.y = y_val
@@ -69,10 +78,13 @@ class DatasetTurbulence(Dataset):
 
         assert len(self.x) == len(self.y), f'Dataset error: length of x ({len(self.x)}) not equal to length of y ({len(self.x)})'
 
-        # PyTorch generall expects the order of axes to be (3,h,w)
+        # PyTorch generally expects the order of axes to be (3,h,w)
         self.x = np.repeat(self.x, 3, -1)
         self.x = self.x.swapaxes(1, 3)
         self.x = self.x.swapaxes(2, 3)
+
+        # Get rid of unecessary dimension
+        self.y = np.reshape(self.y, (self.y.shape[0],))
 
         # Announce useful information
         print(f"{split} split:")

@@ -1,20 +1,14 @@
 version: '3.8'
 services:
-    dev:
-        # Naming
-        hostname: dev
-        container_name: dev
+    dev_copper_0:
+        hostname: dev-copper
+        container_name: dev-copper-0
 
         # Folder where Dockerfile is located
         build: 
             context: ./dev
             shm_size: '32gb'     # Build time shared memory size
         shm_size: '32gb'         # Run time shared memory size
-
-        # Forward these ports through (HOST:CONTAINER)
-        ports:
-        - 8888:8888
-        - 5678:5678
 
         # Mount volumes. For ease of development we share the 
         # local code files with the container's
@@ -27,7 +21,38 @@ services:
                 reservations:
                     devices:
                     - driver: nvidia
-                      count: 1
+                      device_ids: ['0']
+                      capabilities: 
+                        - gpu 
+                        - utility   # nvidia-smi
+                        - compute   # CUDA. Required to avoid "CUDA version: N/A"
+                        - video     # NVENC. For instance to use a hardware accelerated ffmpeg. Skip it if you don't need it
+
+        # Keep the container up (as a development container)
+        command: bash -c "echo 'source activate dev' >> ~/.bashrc && tail -f /dev/null"
+
+    dev_copper_1:
+        hostname: dev-copper
+        container_name: dev-copper-1
+
+        # Folder where Dockerfile is located
+        build: 
+            context: ./dev
+            shm_size: '32gb'     # Build time shared memory size
+        shm_size: '32gb'         # Run time shared memory size
+
+        # Mount volumes. For ease of development we share the 
+        # local code files with the container's
+        volumes:
+            - "./dev/:/home/dev/"
+
+        # Allow single GPU usage
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                    - driver: nvidia
+                      device_ids: ['1']
                       capabilities: 
                         - gpu 
                         - utility   # nvidia-smi
