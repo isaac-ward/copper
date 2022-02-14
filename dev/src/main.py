@@ -52,10 +52,13 @@ if __name__ == '__main__':
     ]
     train_fraction = [ n / 91689 for n in desired_amounts ]
 
+    backbone_key = "conv-simple"
+    log_append = "b-1"
+
     for tf in train_fraction:
 
         # Get a logger 
-        wandb_logger = pytorch_lightning.loggers.WandbLogger(project='copper-hists', log_model=False, name=f"fraction={tf}")
+        wandb_logger = pytorch_lightning.loggers.WandbLogger(project=f'copper-{backbone_key}-{log_append}', log_model=False, name=f"fraction={tf}")
 
         # Get the data
         #ds_train, ds_val, ds_test = data.ds.get_train_val_test_datasets(folder_data)
@@ -63,11 +66,11 @@ if __name__ == '__main__':
         dm_turbulence = data.dm.TurbulenceDataModule(folder_data, batch_size=512, train_fraction=tf)
 
         # Get the model
-        model_baseline = models.Model(lr=0.01)
+        model_baseline = models.Model(lr=0.04, backbone_key=backbone_key)
 
         # Set up the trainer
         trainer = pl.Trainer(
-            max_epochs=0, 
+            max_epochs=64, 
             precision=32,
             gpus=1, 
             accelerator='dp',

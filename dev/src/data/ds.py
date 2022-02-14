@@ -62,11 +62,12 @@ class DatasetTurbulence(Dataset):
             self.y = y_train[:n_fraction]
 
             # Plot histogram
-            wandb.init()
-            data = [[_] for _ in self.y]
-            table = wandb.Table(data=data, columns=["targets"])
-            wandb.log({'histogram': wandb.plot.histogram(table, "targets",
-                title="Label Distribution")})
+            if False:
+                wandb.init()
+                data = [[_] for _ in self.y]
+                table = wandb.Table(data=data, columns=["targets"])
+                wandb.log({'histogram': wandb.plot.histogram(table, "targets",
+                    title="Label Distribution")})
 
         elif split == 'val':
             self.x = x_val

@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 import torch.nn
 import torchvision.models
@@ -11,18 +13,36 @@ class Squeeze(torch.nn.Module):
         return x.squeeze()
 
 class Model(pl.LightningModule):
-    def __init__(self, lr):
+    def __init__(self, lr, backbone_key):
         super().__init__()
 
         self.lr = lr
         
+        # Get the desired backbone
+        if backbone_key == "default-pretrained":
+            insert = self._setup_resnet(pretrained=True)
+
+        elif backbone_key == "default-untrained":
+            insert = self._setup_resnet(pretrained=False)
+
+        elif backbone_key == "conv-simple":
+            insert = self._setup_simple_convnet()
+
+        elif backbone_key == "conv-complex":
+            insert = self._setup_complex_convnet()
+
+        elif backbone_key == "barlow":
+            insert = self._setup_barlow_resnet()
+
+        elif backbone_key == "dino":
+            insert = self._setup_dino_resnet()
+
+        else:
+            print(f"Backbone {backbone_key} is not recognised")
+
         # Need to do this squeeze fix for every model
         self.model = torch.nn.Sequential(
-            #self._setup_barlow_resnet(),
-            self._setup_dino_transformer(),
-            #self._setup_dino_resnet(),
-            #self._setup_resnet(pretrained=False),
-            #self._setup_simple_convnet(),
+            insert,
             Squeeze()
         )
 
@@ -60,7 +80,7 @@ class Model(pl.LightningModule):
 
         # As discussed in the paper - this is the simple convnet
         model = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=1, out_channels=8, kernel_size=4, stride=2, padding_mode='zeros'),
+            torch.nn.Conv2d(in_channels=3, out_channels=8, kernel_size=4, stride=2, padding_mode='zeros'),
             torch.nn.ReLU(),
 
             torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=4, stride=1, padding_mode='zeros'),
@@ -154,21 +174,40 @@ class Model(pl.LightningModule):
         # nothing will be sent to the validation epoch end function
         return outputs
 
-    def validation_epoch_end(self, outputs):
+    def validation_epoch_end(self, outputs, log_label_prepend="val"):
         y     = self._get_output_key_as_tensor(outputs, 'y')
         y_hat = self._get_output_key_as_tensor(outputs, 'y_hat')
 
         # Mean squared error
         mse = self.loss_computer(y_hat, y)
-        self._log_epoch_scalar('val_mse_epoch', mse)
+        self._log_epoch_scalar(f'{log_label_prepend}_mse_epoch', mse)
 
         # Calculate skill
         # First need standard deviation of true labels
         denom = 0.33 #torch.std(y) ** 2
         skill = 1 - mse ** 0.5 / denom
-        self._log_epoch_scalar('val_skill_epoch', skill)
+        self._log_epoch_scalar(f'{log_label_prepend}_skill_epoch', skill)
 
-    # TODO: testing
+        # Calculate R^2
+        theta_p = torch.std(y_hat)  # predicted
+        theta_t = torch.std(y)      # true
+        mean_p = torch.mean(y_hat)
+        mean_t = torch.mean(y)
+        n = len(y)
+        numer   = torch.mean(torch.FloatTensor([ ( y_hat[i] - mean_p ) * ( y[i] - mean_t ) for i in range(n) ]))
+        r2 = ( numer / (theta_p * theta_t) ) ** 2
+        self._log_epoch_scalar(f'{log_label_prepend}_r2_epoch', r2)
+
+    # Testing code parallels what we're doing with val
+
+    def test_step(self, batch, batch_idx):
+        return self.validation_step(batch, batch_idx)
+
+    def test_step_end(self, outputs):
+        return self.validation_step_end(outputs)
+
+    def test_epoch_end(self, outputs):
+        return self.validation_epoch_end(outputs, log_label_prepend="test")
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)

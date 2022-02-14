@@ -1,6 +1,7 @@
 dev/copper*/*
 dev/data/*
 dev/wandb/*
+dev/uncategorized/*
 
 __pycache__
 
